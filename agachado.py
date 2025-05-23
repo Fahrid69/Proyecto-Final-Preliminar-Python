@@ -7,8 +7,8 @@ import pygame.display
 # Constant
 PASO_X = 10
 JUMP_HEIGHT = 100
-JUMP_STEPS = 10
-COLISION_DIST = 40
+JUMP_STEPS = 100
+COLISION_DIST = 45
 
 class Personaje:
     def __init__(self, id, nombre, x, y, estado="Vivo"):
@@ -39,8 +39,8 @@ class Jugador(Personaje):
         self.suelo = True
         self.direccion = "derecha"
         self.estado = False
-        self.tiempo_estado = 7000
-        self.duracion = 7000
+        self.tiempo_estado = 700
+        self.duracion = 15000
         self.imagen_original = None
         
 
@@ -69,7 +69,7 @@ class Game:
         self.font = pygame.font.SysFont("Arial", 18)
         self.game_over_flag = False
 
-        self.jugador = Jugador(1, "Jugador1", self.ancho // 2, self.alto // 1.25)
+        self.jugador = Jugador(1, "Jugador1", self.ancho // 2, self.alto // 1.245)
         self.jugador.imagen_actual = self.imgs["der_inicial"]
         self.players.append(self.jugador)
 
@@ -82,13 +82,17 @@ class Game:
                 "izquierda": pygame.transform.scale(pygame.image.load("assets/2i.png"), (50, 50)),
                 "derecha": pygame.transform.scale(pygame.image.load("assets/2.png"), (50, 50)),
                 "arriba": pygame.transform.scale(pygame.image.load("assets/5.png"), (50, 50)),
-                "abajo": pygame.transform.scale(pygame.image.load("assets/4.png"), (50, 25)),
-                "der_inicial": pygame.transform.scale(pygame.image.load("assets/1.png"), (50, 50)),
-                "izq_inicial": pygame.transform.scale(pygame.image.load("assets/1i.png"), (50, 50)),
+                "arriba_izq": pygame.transform.scale(pygame.image.load("assets/5i.png"), (50, 50)),
+                "abajo": pygame.transform.scale(pygame.image.load("assets/4.png"), (50,50)),
+                "abajo_izq": pygame.transform.scale(pygame.image.load("assets/4i.png"), (50,50)),
+                "der_inicial": pygame.transform.scale(pygame.image.load("assets/1.png"), (50,50)),
+                "izq_inicial": pygame.transform.scale(pygame.image.load("assets/1i.png"), (50,50)),
                 "hongo": pygame.transform.scale(pygame.image.load("assets/hongo_rojo.png"), (30, 30)),
                 "hongoVida": pygame.transform.scale(pygame.image.load("assets/hongo_verde.png"), (30, 30)),
-                "enemy1": pygame.transform.scale(pygame.image.load("assets/enemy1.png"), (50, 50)),
+                "enemy1": pygame.transform.scale(pygame.image.load("assets/enemy1.png"), (50,50)),
                 "enemy0": pygame.transform.scale(pygame.image.load("assets/enemy0.png"), (50, 50)),
+                "star": pygame.transform.scale(pygame.image.load("assets/estrella.png"), (40,40)),
+                "coin": pygame.transform.scale(pygame.image.load("assets/coin.png"), (30, 30))
             }
             return imgs
         except Exception as e:
@@ -101,8 +105,10 @@ class Game:
         self.imgs["derecha"] = pygame.transform.scale(pygame.image.load("assets/2.png"), (tamano, tamano))
         self.imgs["izquierda"] = pygame.transform.scale(pygame.image.load("assets/2i.png"), (tamano, tamano))
         self.imgs["arriba"] = pygame.transform.scale(pygame.image.load("assets/5.png"), (tamano, tamano))
-        self.imgs["abajo"] = pygame.transform.scale(pygame.image.load("assets/4.png"), (tamano, tamano // 2))
-
+        self.imgs["arriba_izq"] = pygame.transform.scale(pygame.image.load("assets/5i.png"), (tamano, tamano))
+        self.imgs["abajo"] = pygame.transform.scale(pygame.image.load("assets/4.png"), (tamano, tamano))
+        self.imgs["abajo_izq"] = pygame.transform.scale(pygame.image.load("assets/4i.png"), (tamano, tamano))
+    
     def spawn_hongos(self):
         y = self.jugador.posicionY
         for tipo in ["hongo", "hongoVida"]:
@@ -136,7 +142,7 @@ class Game:
             dy = abs(jugador.posicionY - hongo["y"])
             if dx < COLISION_DIST and dy < COLISION_DIST:
                 if hongo["tipo"] == "hongoVida":
-                    jugador.vidas += 10
+                    jugador.vidas += 1
                 elif hongo["tipo"] == "hongo":
                     if not jugador.estado:
                         jugador.tamanio = 80
@@ -157,22 +163,23 @@ class Game:
     def draw(self):
         self.ventana.blit(self.imgs["fondo"],(0,0))
 
-        # DIBUJAR AL JUGADOR
+# DIBUJAR AL JUGADOR
         jugador = self.jugador
         self.ventana.blit(jugador.imagen_actual, (jugador.posicionX, jugador.posicionY))
 
-        # DIBUJAR AL ENEMIGO
+#DIBUJAR ENEMY
         for enemigo in self.enemigos:
             self.ventana.blit(self.imgs["enemy1"], (enemigo.posicionX, enemigo.posicionY))
 
-        # DIBUJAR HONGOS
+#DIBUJAR HONGOS
         for hongo in self.hongos:
             self.ventana.blit(self.imgs[hongo["tipo"]], (hongo["x"], hongo["y"]))
 
-        # STATS tiempo
+#STATS
         self.draw_text(f"Vidas: {jugador.vidas}", 10, 10)
         self.draw_text(f"Puntos: {jugador.puntos}", 10, 30)
         self.draw_text(f"Tamaño: {jugador.tamanio}", 10, 50)
+        self.draw_text(f"Posición: {jugador.posicionX, jugador.posicionY}", 10, 70)
 
         if self.game_over_flag:
             over_text = pygame.font.SysFont("Arial", 48).render("GAME OVER", True, (255, 0, 0))
@@ -197,13 +204,20 @@ class Game:
                 jugador.direccion = "izquierda"
                 jugador.mover(dx=-PASO_X)
         elif keys[pygame.K_DOWN]: #
+            jugador.suelo = True
+            if jugador.direccion == "derecha":
                 jugador.imagen_actual = self.imgs["abajo"]
+            elif jugador.direccion == "izquierda":
+                jugador.imagen_actual = self.imgs["abajo_izq"]
         elif keys[pygame.K_UP] and jugador.suelo: # SALTO DEL JUGADOR
             jugador.velocidad_salto = -15
             jugador.suelo = False
-            jugador.imagen_actual = self.imgs["arriba"]
-                        # duracion
-        if not keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT] and jugador.suelo:
+            if jugador. direccion == "derecha":
+                jugador.imagen_actual = self.imgs["arriba"]
+            else:
+                jugador.imagen_actual = self.imgs ["arriba_izq"]
+
+        if not keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT] and not keys[pygame.K_DOWN] and jugador.suelo:
             if jugador.estado:  #
                 if jugador.direccion == "derecha":
                     jugador.imagen_original = self.imgs["der_inicial"]
@@ -243,6 +257,11 @@ class Game:
             if len(self.enemigos) < 2:
                 self.spawn_enemy()
             self.last_spawn_time = tiempo_actual
+
+        if jugador.posicionX <= -100:
+            jugador.posicionX = self.ancho
+        elif jugador.posicionX >= self.ancho + 50:
+            jugador.posicionX = -50
 
 
         if jugador.estado:
