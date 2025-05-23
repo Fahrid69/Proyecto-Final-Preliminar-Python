@@ -4,7 +4,7 @@ import sys
 
 import pygame.display
 
-# Constantes
+# Constant
 PASO_X = 10
 JUMP_HEIGHT = 100
 JUMP_STEPS = 10
