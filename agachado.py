@@ -258,12 +258,6 @@ class Game:
                 self.spawn_enemy()
             self.last_spawn_time = tiempo_actual
 
-        if jugador.posicionX <= -100:
-            jugador.posicionX = self.ancho
-        elif jugador.posicionX >= self.ancho + 50:
-            jugador.posicionX = -50
-
-
         if jugador.estado:
             tiempo = pygame.time.get_ticks()
             if tiempo - jugador.tiempo_estado > jugador.duracion:
