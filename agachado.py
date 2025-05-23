@@ -240,7 +240,7 @@ class Game:
         # enemigos por tiempo suelo coordy
         tiempo_actual = pygame.time.get_ticks()
         if tiempo_actual - self.last_spawn_time > self.spawn_interval:
-            if len(self.enemigos) < 10:
+            if len(self.enemigos) < 2:
                 self.spawn_enemy()
             self.last_spawn_time = tiempo_actual
 
