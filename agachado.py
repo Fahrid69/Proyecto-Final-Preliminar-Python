@@ -4,7 +4,9 @@ import sys
 import pygame.display
 
 PASO_X = 10
-COLISION_DIST = 35
+COLISION_DIST = 40
+DURACION_ESTADO_GRANDE = 20000 
+DURACION_ESTADO_INMUNIDAD = 7000 
 
 class Personaje:
     def __init__(self, id, nombre, x, y):
@@ -22,7 +24,7 @@ class Jugador(Personaje):
         super().__init__(id, nombre, x, y)
         self.vidas = 3
         self.monedas = 0
-        self.puntos = 0
+        self.estado = "normal"
         self.tiempo = 300
         self.dispara = False
         self.tamanio = 50
@@ -33,12 +35,8 @@ class Jugador(Personaje):
         self.gravedad = 1
         self.suelo = True
         self.direccion = "derecha"
-        self.grande = False
         self.tiempo_estado = 700
-        self.duracion = 7000
         self.imagen_original = None
-        self.inmortal = False
-        
 
 class Enemigo(Personaje):
     def __init__(self, id, nombre, x=0, y=0):
@@ -52,6 +50,8 @@ class Game:
         self.ancho, self.alto = 800, 600
         self.ventana = pygame.display.set_mode((self.ancho, self.alto))
         self.reloj = pygame.time.Clock()
+        self.enemigos_generados = 0
+        self.max_enemigos = 10
 
         self.imgs = self.load_images()
 
@@ -69,7 +69,7 @@ class Game:
         self.font = pygame.font.SysFont("Arial", 18)
         self.game_over_flag = False
 
-        self.jugador = Jugador(1, "mario", self.ancho // 2, self.alto // 1.245)
+        self.jugador = Jugador(1, "mario", self.ancho // 2, 480)
         self.jugador.imagen_actual = self.imgs["der_inicial"]
         self.players.append(self.jugador)
 
@@ -100,6 +100,7 @@ class Game:
                 "super_izq_inicial": pygame.transform.scale(pygame.image.load("assets/1i_super.png"), (50,50)),
                 "hongo": pygame.transform.scale(pygame.image.load("assets/hongo_rojo.png"), (30, 30)),
                 "hongoVida": pygame.transform.scale(pygame.image.load("assets/hongo_verde.png"), (30, 30)),
+                "enemy2": pygame.transform.scale(pygame.image.load("assets/enemy2.png"), (50, 50)),
                 "enemy1": pygame.transform.scale(pygame.image.load("assets/enemy1.png"), (50,50)),
                 "enemy0": pygame.transform.scale(pygame.image.load("assets/enemy0.png"), (50, 50)),
                 "star": pygame.transform.scale(pygame.image.load("assets/estrella.png"), (40,40)),
@@ -131,10 +132,16 @@ class Game:
             self.hongos.append({"tipo": tipo, "x": x, "y": y})
 
     def spawn_enemy(self):
+        if len(self.enemigos) >= 2:
+            return
+        if self.enemigos_generados >= self.max_enemigos:
+            return
         y = self.alto // 1.295
 
-        enemigo = Enemigo(len(self.enemigos) + 2, "Enemigo", self.ancho, y)
+        enemigo = Enemigo(len(self.enemigos) + 2, "enemigo", self.ancho, y)
         self.enemigos.append(enemigo)
+        self.enemigos_generados += 1
+         
     
     def spawn_star(self):
         x = 285
@@ -163,12 +170,21 @@ class Game:
 
     def check_collisions(self):
         jugador = self.jugador
-        for enemigo in self.enemigos[:]: #COLISION CON EL ENEMIGO
+        for enemigo in self.enemigos[:]: #COLISION CON EL ENEMIGO 
             dx = abs(jugador.posicionX - enemigo.posicionX)
             dy = abs(jugador.posicionY - enemigo.posicionY)
             if dx < COLISION_DIST and dy < COLISION_DIST:
-                if jugador.grande or jugador.inmortal: #ESTADO Y ENEMIGO
+                if jugador.estado == "inmunidad": #ESTADO Y ENEMIGO
                     self.enemigos.remove(enemigo)
+                elif jugador.estado == "grande":
+                    jugador.tamanio = 50
+                    jugador.estado = "normal"
+                    jugador.vidas +=1
+                    self.incremento_imgs(jugador.tamanio)
+                    if jugador.direccion == "derecha":
+                        jugador.imagen_actual = self.imgs["der_inicial"]
+                    else:
+                        jugador.imagen_actual = self.imgs["izq_inicial"]
                 else:
                     if not jugador.saltando:
                         jugador.vidas -= 1
@@ -195,9 +211,9 @@ class Game:
                 if hongo["tipo"] == "hongoVida":
                     jugador.vidas += 1
                 elif hongo["tipo"] == "hongo":
-                    if not jugador.grande and not jugador.inmortal:
-                        jugador.tamanio = 80
-                        jugador.grande = True
+                    if not jugador.estado in ["inmunidad", "grande"]:
+                        jugador.tamanio = 70
+                        jugador.estado = "grande"
                         jugador.tiempo_estado = pygame.time.get_ticks()
                         self.incremento_imgs(jugador.tamanio)
 
@@ -212,8 +228,8 @@ class Game:
             dy = abs(jugador.posicionY - self.star["y"])
             if dx <= COLISION_DIST and dy <= COLISION_DIST:
                 if dx <= COLISION_DIST and dy <= COLISION_DIST:
-                    if not jugador.inmortal and not jugador.grande:
-                        jugador.inmortal = True
+                    if not jugador.estado in ["inmunidad", "grande"]:
+                        jugador.estado = "inmunidad"
                         jugador.tiempo_estado = pygame.time.get_ticks()
                         self.star["activa"] = False
 
@@ -238,7 +254,7 @@ class Game:
 
 #STATS
         self.text(f"Vidas: {jugador.vidas}", 10, 10)
-        self.text(f"Tamaño: {jugador.tamanio}", 10, 30)
+        self.text(f"Estado: {jugador.estado}", 10, 30)
         self.text(f"Monedas: {jugador.monedas}/10", 10, 50)
         self.text(f"Posición: {jugador.posicionX, jugador.posicionY}", 10, 70)
         self.text(f"Tiempo: {pygame.time.get_ticks() //1000} segs", 10, 575)
@@ -264,46 +280,46 @@ class Game:
         jugador.velocidad_salto += jugador.gravedad
         jugador.mover(dy=jugador.velocidad_salto)
         suelo_coordy = self.get_suelo_y()
-        monedas_activas = sum(1 for c in self.coins if c["activa"] and not c["recogida"])
+        coins_activas = sum(1 for c in self.coins if c["activa"] and not c["recogida"])
         jugador.posicionX = max(0, min(jugador.posicionX, self.ancho - jugador.tamanio))
         jugador.posicionY = max(0, min(jugador.posicionY, self.alto - jugador.tamanio))
 
 
         if keys[pygame.K_RIGHT]:
-            jugador.imagen_actual = self.imgs["super_derecha"] if jugador.inmortal else self.imgs["derecha"]
+            jugador.imagen_actual = self.imgs["super_derecha"] if jugador.estado == "inmunidad" else self.imgs["derecha"]
             jugador.direccion = "derecha"
             jugador.mover(dx=PASO_X)
         elif keys[pygame.K_LEFT]:
-            jugador.imagen_actual = self.imgs["super_izquierda"] if jugador.inmortal else self.imgs["izquierda"]
+            jugador.imagen_actual = self.imgs["super_izquierda"] if jugador.estado == "inmunidad" else self.imgs["izquierda"]
             jugador.direccion = "izquierda"
             jugador.mover(dx=-PASO_X)
         elif keys[pygame.K_DOWN]: #
             jugador.suelo = True
             if jugador.direccion == "derecha":
-                jugador.imagen_actual = self.imgs["super_abajo"] if jugador.inmortal else self.imgs["abajo"]
+                jugador.imagen_actual = self.imgs["super_abajo"] if jugador.estado == "inmunidad" else self.imgs["abajo"]
             elif jugador.direccion == "izquierda":
-                jugador.imagen_actual = self.imgs["super_abajo_izq"] if jugador.inmortal else self.imgs["abajo_izq"]
+                jugador.imagen_actual = self.imgs["super_abajo_izq"] if jugador.estado == "inmunidad" else self.imgs["abajo_izq"]
         elif keys[pygame.K_UP] and jugador.suelo: # SALTO DEL JUGADOR
             jugador.velocidad_salto = -15
             jugador.suelo = False
             if jugador. direccion == "derecha":
-                jugador.imagen_actual = self.imgs["super_arriba"] if jugador.inmortal else self.imgs["arriba"]
+                jugador.imagen_actual = self.imgs["super_arriba"] if jugador.estado == "inmunidad" else self.imgs["arriba"]
             else:
-                jugador.imagen_actual = self.imgs ["super_arriba_izq"] if jugador.inmortal else self.imgs["arriba_izq"]
+                jugador.imagen_actual = self.imgs ["super_arriba_izq"] if jugador.estado == "inmunidad" else self.imgs["arriba_izq"]
 
         if not keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT] and not keys[pygame.K_DOWN] and jugador.suelo:
-            if jugador.grande:  
+            if jugador.estado == "grande":  
                 if jugador.direccion == "derecha":
                     jugador.imagen_original = self.imgs["der_inicial"]
-                    jugador.imagen_actual = pygame.transform.scale(jugador.imagen_original, (80, 80))
+                    jugador.imagen_actual = pygame.transform.scale(jugador.imagen_original, (70, 70))
                 elif jugador.direccion == "izquierda":
                     jugador.imagen_original = self.imgs["izq_inicial"]
-                    jugador.imagen_actual = pygame.transform.scale(jugador.imagen_original, (80, 80))
+                    jugador.imagen_actual = pygame.transform.scale(jugador.imagen_original, (70, 70))
             else: # controles normales
                 if jugador.direccion == "derecha":
-                    jugador.imagen_actual = self.imgs["super_der_inicial"] if jugador.inmortal else self.imgs["der_inicial"]
+                    jugador.imagen_actual = self.imgs["super_der_inicial"] if jugador.estado == "inmunidad" else self.imgs["der_inicial"]
                 elif jugador.direccion == "izquierda":
-                    jugador.imagen_actual = self.imgs["super_izq_inicial"] if jugador.inmortal else self.imgs["izq_inicial"]
+                    jugador.imagen_actual = self.imgs["super_izq_inicial"] if jugador.estado == "inmunidad" else self.imgs["izq_inicial"]
 
         if not jugador.suelo:
             jugador.velocidad_salto += jugador.gravedad
@@ -336,30 +352,15 @@ class Game:
                 self.spawn_enemy()
             self.last_spawn_time = tiempo_actual
 
-        if jugador.grande:
-            tiempo = pygame.time.get_ticks()
-            if tiempo - jugador.tiempo_estado > jugador.duracion:
-                jugador.grande = False
+        if jugador.estado == "grande":
+            if pygame.time.get_ticks() - jugador.tiempo_estado > DURACION_ESTADO_GRANDE:
+                jugador.estado = "normal"
                 jugador.tamanio = 50
                 self.incremento_imgs(jugador.tamanio)
-                if jugador.direccion == "derecha":
-                    jugador.imagen_actual = self.imgs["der_inicial"]
-                else:
-                    jugador.imagen_actual = self.imgs["izq_inicial"]
 
-        if jugador.grande:
-            tiempo = pygame.time.get_ticks()
-            if tiempo - jugador.tiempo_estado > jugador.duracion:
-                jugador.grande = False
-                jugador.tamanio = 50
-                self.incremento_imgs(jugador.tamanio)
-                if jugador.direccion == "derecha":
-                    jugador.imagen_actual = self.imgs["der_inicial"]
-                else:
-                    jugador.imagen_actual = self.imgs["izq_inicial"]
 
 # NUEVAS MONEDAS
-        if monedas_activas < 2:
+        if coins_activas < 2:
             for coin in self.coins:
                 if not coin["activa"] and not coin["recogida"] and coin["respawn_time"]:
                     if pygame.time.get_ticks() >= coin["respawn_time"]:
@@ -385,11 +386,12 @@ class Game:
                         else:
                             coin["respawn_time"] = pygame.time.get_ticks() + random.randint(8000, 9000)
 
+
 # ESTADO DE INVULNERABILIDAD
-        if jugador.inmortal:
+        if jugador.estado == "inmunidad":
             tiempo = pygame.time.get_ticks()
-            if tiempo - jugador.tiempo_estado > jugador.duracion:
-                jugador.inmortal = False
+            if tiempo - jugador.tiempo_estado > DURACION_ESTADO_INMUNIDAD:
+                jugador.estado = "normal"
 
             
     def get_suelo_y(self):
